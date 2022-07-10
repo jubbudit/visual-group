@@ -9,8 +9,44 @@ var labelDist = 1.08;
 var power = 1;
 var cycleCount = 1;
 var cycleType = [20];
+var textGenerator = "";
+var randomPerm;
+var cyclePerm;
+var cycleNums = {};
 //var color1 = color("red");
 //var color2 = color("blue");
+
+/* ##### jQuery Controllers ##### */
+
+$(document).ready(function() {
+    $("#generatorSelector").change(function(){
+        if ($("#generatorSelector").val() === "custom") {
+            $("#customGenerator").removeClass("options-hidden");
+            $("#randomButton").addClass("options-hidden");
+            
+        } else if ($("#generatorSelector").val() === "random") {
+            $("#customGenerator").addClass("options-hidden");
+            $("#randomButton").removeClass("options-hidden");
+        } else {
+            $("#customGenerator").addClass("options-hidden");
+            $("#randomButton").addClass("options-hidden");
+        }
+    });
+    
+    $("#randomize").click(function() {
+        randomPerm = randomPermutation(polyPoints);
+    });
+    
+});
+
+function updateRange() {
+    var order = calculateLCM(genCycleType());
+    $("#permPowerRange").attr('max', order);
+}
+
+function aboutModal() {
+  $('#aboutModal').modal('show');
+}
 
 /* ##### App Functions ##### */
 function minimum(a, b) {
@@ -19,14 +55,6 @@ function minimum(a, b) {
     } else {
         return b;
     }
-}
-
-function listRemove(val, ary) {
-    if (ary.indexOf(val) > -1) {
-        return 0;
-    }
-    return ary.splice(ary.indexOf(val), 1);
-    return 1;
 }
 
 function getDotX(d) {
@@ -59,27 +87,33 @@ function getCurveY(d) {
     return 0.5*yBorder + (sin(angle*d) * (polyRadius*curveStrength));
 }
 
-function createDot(x,y,r) {
+function createDot(x,y,r,c) {
     noStroke();
-    fill('rgba(200,169,169,0.5)');
+    fill(0);
     circle(x, y, r);
+    fill(c);
+    circle(x, y, r*0.8);
 }
 
 function polygon(radius, npoints) {
     var angle = TWO_PI / npoints;
+    var i = 0;
     for (let a = 0; a < TWO_PI; a += angle) {
         var sx = 0.5*xBorder + (cos(a) * radius);
         var sy = 0.5*yBorder + (sin(a) * radius);
-        createDot(sx, sy, minimum(xBorder, yBorder)*0.02);
+        createDot(sx, sy, minimum(xBorder, yBorder)*0.02, lerpColor(color(0,0,0), color(255,255,255), cycleNums[i]/cycleType.length));
+        i++;
     }
 }
 
 function labelPolygon(radius, npoints) {
-    stroke(0);
     var angle = TWO_PI / npoints;
     for (let i = 0; i < npoints; i += 1) {
         var sx = 0.5*xBorder + (cos(angle*i) * (radius*labelDist));
         var sy = 0.5*yBorder + (sin(angle*i) * (radius*labelDist));
+        
+        textStyle(NORMAL);
+        stroke(0);
         text(i+1, sx, sy);
     }
 }
@@ -104,20 +138,27 @@ function drawCycle(cycle, color) {
 function drawPermutation(perm) {
     var points = pointList(polyPoints);
     var cycles = [];
+    textGenerator = "";
+    var cycNum = 0;
+    cycleNums = {};
     while (points.length > 0) {
         var cycle = [];
         var cycStart = points.shift();
         cycle.push(cycStart);
         var cycCurrent = perm[cycStart];
+        cycleNums[cycStart] = cycNum;
+        textGenerator = textGenerator.concat("(", cycStart+1);
         while (cycCurrent != cycStart) {
+            cycleNums[cycCurrent] = cycNum;
+            textGenerator = textGenerator.concat(", ", cycCurrent+1);
             cycle.push(cycCurrent);
             points.splice(points.indexOf(cycCurrent), 1);
             cycCurrent = perm[cycCurrent];
         }
+        textGenerator = textGenerator.concat(")");
         cycles.push(cycle);
-        //console.log(cycle)
+        cycNum++;
     }
-    //console.log("hello")
     cycleCount = cycles.length;
     cycleType = [];
     for (let i = 0; i < cycles.length; i++) {
@@ -141,7 +182,6 @@ function permComp(perm1, perm2, npoints) {
             cycCurrent = perm2[perm1[temp]];
             cycPrev = temp;
         }
-        //console.log(perm);
         perm[cycPrev] = cycStart;
     }
     return perm;
@@ -156,8 +196,8 @@ function permPower(perm, power) {
 }
 
 function getCycleType() {
-    cycleType.sort();
-    cycleType.reverse();
+    cycleType = cycleType.sort();
+    cycleType = cycleType.reverse();
     ret = "(";
     for (let i = 0; i < cycleType.length-1; i++) {
         ret = ret.concat(cycleType[i], ", ");
@@ -165,12 +205,67 @@ function getCycleType() {
     return ret.concat(cycleType[cycleType.length-1], ")");
 }
 
+function genCycleType() {
+    var perm = cyclePerm;
+    var points = pointList(polyPoints);
+    var cycles = [];
+    while (points.length > 0) {
+        var cycle = [];
+        var cycStart = points.shift();
+        cycle.push(cycStart);
+        var cycCurrent = perm[cycStart];
+        while (cycCurrent != cycStart) {
+            cycle.push(cycCurrent);
+            points.splice(points.indexOf(cycCurrent), 1);
+            cycCurrent = perm[cycCurrent];
+        }
+        cycles.push(cycle);
+    }
+    cycType = [];
+    for (let i = 0; i < cycles.length; i++) {
+        cycType.push(cycles[i].length);
+    }
+    return cycType;
+}
+
 function singleCycle(npoints) {
-    perm = {}
+    perm = {};
     for(let i = 0; i < npoints-1; i++) {
         perm[i] = i+1;
     }
     perm[npoints-1] = 0;
+    return perm;
+}
+
+function randomElement(li) {
+    if (li.length <= 0) {
+        return -1
+    }
+    return li[Math.floor(Math.random()*li.length)];
+}
+
+function randomPermutation(npoints) {
+    var points = pointList(npoints);
+    var perm = {};
+    while (points.length > 0) {
+        var cycleLength = Math.floor(Math.random()*points.length);
+        var cycStart = randomElement(points);
+        points.splice(points.indexOf(cycStart), 1);
+        if (cycleLength > 1) {
+            var cycPrev = cycStart;
+            for (let i = 0; i < cycleLength; i++) {
+                var cycCurrent = randomElement(points);
+                points.splice(points.indexOf(cycCurrent), 1);
+                perm[cycPrev] = cycCurrent;
+                cycPrev = cycCurrent;
+            }
+            perm[cycCurrent] = cycStart;
+            //points.splice(points.indexOf(cycCurrent), 1);
+        } else {
+            perm[cycStart] = cycStart;
+        }
+    }
+    
     return perm;
 }
 
@@ -189,7 +284,6 @@ function parseGenerator(genVal) {
     for (let i = 0; i < genCycles.length; i++) {
         var cycle = genCycles[i].split(",");
         if (cycle.length > 1 && cycle[0] && cycle[1]) {
-            console.log(cycle)
             var startIndex = parseInt(cycle[0])-1;
             if (points.indexOf(startIndex) < 0) {
                 return singleCycle(polyPoints);
@@ -222,7 +316,8 @@ function parseGenerator(genVal) {
 function updateVars() {
     $('#cycles').html(cycleCount);
     $('#cycleType').html(getCycleType());
-    $('#order').html(calculateLCM(cycleType))
+    $('#order').html(calculateLCM(cycleType));
+    $("#groupGen").html(textGenerator);
     polyPoints = $("#polyPoints").html();
     curveStrength = $("#curveStrength").html();
     power = $("#permPower").html();
@@ -242,24 +337,28 @@ function windowResized() {
 function setup() {
     mainCanvas = createCanvas(xBorder, yBorder);
     mainCanvas.parent("appScreen");
+    randomPerm = randomPermutation(polyPoints);
 }
 
 function draw() {
     background(255);
     updateVars();
-
-    push();
+    
+    if ($("#generatorSelector").val() === "single-cycle") {
+        cyclePerm = singleCycle(polyPoints);
+    } else if ($("#generatorSelector").val() === "random") {
+        if (Object.keys(randomPerm).length == polyPoints) {
+            cyclePerm = randomPerm;
+        } else {
+            randomPerm = randomPermutation(polyPoints);
+            cyclePerm = randomPerm;
+        }
+    } else {
+        cyclePerm = parseGenerator($('#generator').val());       
+    }
+    drawPermutation(permPower(cyclePerm, power));
+    updateRange();
+    
     labelPolygon(polyRadius, polyPoints);
     polygon(polyRadius, polyPoints);
-    pop();
-    
-    try {
-        cyclePerm = parseGenerator($('#generator').val());
-    } catch(err) {
-        cyclePerm = singleCycle(polyPoints);
-    }
-    //drawPermutation(cyclePerm);
-    drawPermutation(permPower(cyclePerm, power));
-    
-
 }
