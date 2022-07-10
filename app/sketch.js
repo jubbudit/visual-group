@@ -5,7 +5,7 @@ var yBorder = $(window).height()*0.9;
 var polyPoints = 20;
 var polyRadius = minimum(xBorder, yBorder)*0.4;
 var curveStrength = 2.5;
-var labelDist = 1.08;
+var labelDist = 1.5;
 var power = 1;
 var cycleCount = 1;
 var cycleType = [20];
@@ -324,7 +324,7 @@ function updateVars() {
     xBorder = $(window).width()*0.8;
     yBorder = $(window).height()*0.9;
     polyRadius = minimum(xBorder, yBorder)*0.4;
-    labelDist = 1.08;
+    labelDist = 1.15;
 }
 
 /* ##### p5 Functions ##### */
